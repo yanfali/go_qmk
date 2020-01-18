@@ -6,7 +6,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/gin-gonic/gin"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/zekth/go_qmk/api/controllers"
+	"github.com/zekth/go_qmk/api/internal/controllers"
 )
 
 // Version of the application. Githash
