@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 type KeyboardMetadata struct {
 	Name    string
 	Keymaps []string
+	Config  map[string]string
+	Rules   map[string]string
 }
 
 func main() {
@@ -70,11 +73,35 @@ func main() {
 	}
 
 	err := filepath.Walk(myDir, matchInfoJSON)
-	for key := range keebSet {
-		fmt.Printf("%v\n", key)
-	}
-
 	if err != nil {
 		fmt.Printf("error walking the path %q: %v\n", myDir, err)
 	}
+
+	for key := range keebSet {
+		fmt.Printf("%v\n", key)
+		rulesPath := filepath.Join(myDir, key, "rules.mk")
+		fmt.Println(rulesPath)
+		f, err := os.Open(rulesPath)
+		if err == nil {
+			defer f.Close()
+			scanner := bufio.NewScanner(f)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, "#") || len(line) == 0 {
+					continue
+				}
+				tokens := strings.Split(line, "=")
+				if len(tokens) > 1 {
+					key := strings.TrimSpace(tokens[0])
+					value := strings.TrimSpace(tokens[1])
+					if len(strings.Split(value, "#")) > 1 {
+						value = strings.TrimSpace(strings.Split(value, "#")[0])
+					}
+					fmt.Printf("%q=%q\n", key, value)
+				}
+
+			}
+		}
+	}
+
 }
