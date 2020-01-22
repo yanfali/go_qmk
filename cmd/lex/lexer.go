@@ -128,41 +128,51 @@ func lexNextToken(l *lexer) stateFn {
 			l.pos = l.start
 			return lexAssignment
 		}
-
-		if r == eof || r == '\n' {
-			goto exit
-		}
 	}
-exit:
-	return lexText
 }
 
 func lexComment(l *lexer) stateFn {
 	for {
-		switch r := l.next(); {
+		switch r := l.next(); r {
 		// continuation
 		// scan until new line or eof
-		case r == '\\':
+		case '\\':
 			for {
-				r1 := l.next()
-				if r1 == eof || r1 == '\n' {
+				r = l.next()
+				if isEOL(r, l) {
 					break
 				}
 			}
 			break
 		// end of comment
-		case r == eof || r == '\n':
-			l.backup()
-			l.emit(itemComment)
-			return lexText
+		default:
+			if isEOL(r, l) {
+				l.backup()
+				l.emit(itemComment)
+				return lexText
+			}
 		}
 	}
+}
+
+func isEOL(r rune, l *lexer) bool {
+	return r == eof || r == '\n' || (r == '\r' && l.peek() == '\n')
 }
 
 func lexAssignment(l *lexer) stateFn {
 	for {
 		r := l.next()
-		if r == eof || r == '\n' {
+		// handle multiline assignment
+		if r == '\\' {
+			for {
+				r = l.next()
+				if isEOL(r, l) {
+					break
+				}
+			}
+			continue
+		}
+		if isEOL(r, l) {
 			l.backup()
 			goto emitAssignment
 		}

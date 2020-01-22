@@ -120,6 +120,23 @@ func TestLexer(t *testing.T) {
 				{typ: itemEOF},
 			},
 		},
+		{
+			name:  "windows eol",
+			input: "#comment\r\nMCU = stm32",
+			expected: []item{
+				{typ: itemComment, val: "#comment"},
+				{typ: itemAssignment, val: "MCU = stm32"},
+				{typ: itemEOF},
+			},
+		},
+		{
+			name:  "multi-line assignment",
+			input: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c",
+			expected: []item{
+				{typ: itemAssignment, val: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c"},
+				{typ: itemEOF},
+			},
+		},
 	}
 
 	var passed uint64
