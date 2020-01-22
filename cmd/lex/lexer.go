@@ -111,16 +111,19 @@ func lexNextToken(l *lexer) stateFn {
 	// found a simple assignment
 	for {
 		r := l.next()
-		if r == eof || r == '\n' {
-			goto emitAssignment
+		if r == '=' {
+			l.pos = l.start
+			return lexAssignment
 		}
-		if r == '#' {
-			l.backup()
-			goto emitAssignment
+		if r == '?' && l.peek() == '=' {
+			l.pos = l.start
+			return lexAssignment
+		}
+		if r == eof || r == '\n' {
+			goto exit
 		}
 	}
-emitAssignment:
-	l.emit(itemAssignment)
+exit:
 	return lexText
 }
 
@@ -145,11 +148,23 @@ func lexComment(l *lexer) stateFn {
 	}
 }
 
-/*
 func lexAssignment(l *lexer) stateFn {
+	for {
+		r := l.next()
+		if r == eof || r == '\n' {
+			goto emitAssignment
+		}
+		if r == '#' {
+			l.backup()
+			goto emitAssignment
+		}
+	}
+emitAssignment:
+	l.emit(itemAssignment)
 	return lexText
 }
 
+/*
 func lexFunction(l *lexer) stateFn {
 	return lexText
 }
@@ -198,6 +213,12 @@ func (l *lexer) backup() {
 	l.pos -= l.width
 }
 
+func (l *lexer) peek() rune {
+	r := l.next()
+	l.backup()
+	return r
+}
+
 // accept consumes the next rune if it's from the valid set.
 func (l *lexer) accept(valid string) bool {
 	if strings.ContainsRune(valid, l.next()) {
@@ -226,6 +247,7 @@ func main() {
 		{"a variable", "MCU = atmega32u4"},
 		{"a variable and a comment", "MCU = atmega32u4 # comment"},
 		{"2 vars and a comment", "MCU = atmega32u4 # comment\nMOUSE_ENABLE=yes"},
+		{"a optional variable", "MCU ?= atmega32u4"},
 	}
 
 	for _, test := range tests {
