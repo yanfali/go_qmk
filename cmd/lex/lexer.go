@@ -14,6 +14,7 @@ const (
 	itemError itemType = iota
 	itemComment
 	itemAssignment
+	itemSimplyExpanedAssignment
 	/*
 		itemFunction
 		itemRule
@@ -111,14 +112,29 @@ func lexNextToken(l *lexer) stateFn {
 	// found a simple assignment
 	for {
 		r := l.next()
+		// recursively expanded
+		// simply expanded variable
+		if r == ':' && l.peek() == '=' {
+			l.pos = l.start
+			return lexAssignment
+		}
+
+		// simply expanded variable
+		if r == ':' && l.accept(":") && l.accept(":") {
+			l.pos = l.start
+			return lexAssignment
+		}
+
+		// optional setting and append setting
+		if (r == '?' || r == '+') && l.peek() == '=' {
+			l.pos = l.start
+			return lexAssignment
+		}
 		if r == '=' {
 			l.pos = l.start
 			return lexAssignment
 		}
-		if r == '?' && l.peek() == '=' {
-			l.pos = l.start
-			return lexAssignment
-		}
+
 		if r == eof || r == '\n' {
 			goto exit
 		}
@@ -235,31 +251,51 @@ func (l *lexer) acceptRun(valid string) {
 	l.backup()
 }
 
+/*
 func main() {
 	tests := []struct {
-		name  string
-		input string
+		name     string
+		input    string
+		expected []item
 	}{
-		{"a comment", "#comment"},
-		{"a multline", "#comment \\\nsome more comment"},
-		{"a multline with one space before next line", "#comment \\ \nsome more comment\n#a new comment"},
-		{"a multline with 3 spaces before next line", "#comment \\   \nsome more comment\n"},
-		{"a variable", "MCU = atmega32u4"},
-		{"a variable and a comment", "MCU = atmega32u4 # comment"},
-		{"2 vars and a comment", "MCU = atmega32u4 # comment\nMOUSE_ENABLE=yes"},
-		{"a optional variable", "MCU ?= atmega32u4"},
+		{name: "a comment", input: "#comment", expected: []item{{typ: itemComment, val: "#comment"}, {typ: itemEOF, val: ""}}},
+		{
+			name:  "a multline",
+			input: "#comment \\\nsome more comment",
+			expected: []item{
+				{typ: itemComment, val: "#comment \\\nsome more comment"},
+				{typ: itemEOF, val: ""},
+			},
+		},
+		{name: "a multline with one space before next line", input: "#comment \\ \nsome more comment\n#a new comment"},
+		{name: "a multline with 3 spaces before next line", input: "#comment \\   \nsome more comment\n"},
+		{name: "a recursively expanded variable", input: "MCU = atmega32u4"},
+		{name: "a variable and a comment", input: "MCU = atmega32u4 # comment"},
+		{name: "2 vars and a comment", input: "MCU = atmega32u4 # comment\nMOUSE_ENABLE=yes"},
+		{name: "a optional variable", input: "MCU ?= atmega32u4 # comment it"},
+		{name: "a addition variable", input: "MCU += atmega32u4 # comment it 2"},
+		{name: "a simply expanded variable", input: "MCU := atmega32u4"},
+		{name: "a simply expanded variable 2", input: "MCU ::= atmega32u4"},
+		{name: "a shell expanded variable", input: "MCU != atmega32u4"},
 	}
 
 	for _, test := range tests {
 		_, ch := lex(test.name, test.input)
 
 		fmt.Printf("test %s\n", test.name)
+		tokens := []item{}
 		for {
 			token := <-ch
 			fmt.Printf("%s\n", token)
+			tokens = append(tokens, token)
 			if token.typ == itemEOF {
 				break
 			}
 		}
+		if len(test.expected) > 0 && len(test.expected) != len(tokens) {
+			fmt.Printf("test.expected %d tokens, got %d\n", len(test.expected), len(tokens))
+			panic(fmt.Errorf("test failed %s", test.name))
+		}
 	}
 }
+*/
