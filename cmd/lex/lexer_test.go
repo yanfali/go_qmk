@@ -1,10 +1,12 @@
 package main
 
 import (
+	"sync/atomic"
 	"testing"
 )
 
 func TestLexer(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -106,35 +108,43 @@ func TestLexer(t *testing.T) {
 		},
 	}
 
-	passed := 0
-	failed := 0
-	for _, test := range tests {
-		_, ch := lex(test.name, test.input)
+	var passed uint64
+	var failed uint64
+	group := func(t *testing.T) {
+		// group them so we can wait until all tests are finished running
+		for _, test := range tests {
+			test := test
+			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+				_, ch := lex(test.name, test.input)
 
-		//fmt.Printf("test %s\n", test.name)
-		tokens := []item{}
-		for {
-			token := <-ch
-			//fmt.Printf("%s\n", token)
-			tokens = append(tokens, token)
-			if token.typ == itemEOF {
-				break
-			}
+				//fmt.Printf("test %s\n", test.name)
+				tokens := []item{}
+				for {
+					token := <-ch
+					//fmt.Printf("%s\n", token)
+					tokens = append(tokens, token)
+					if token.typ == itemEOF {
+						break
+					}
+				}
+				if len(test.expected) != len(tokens) {
+					t.Errorf("ERROR %s: expected %d tokens, got %d\n", test.name, len(test.expected), len(tokens))
+					atomic.AddUint64(&failed, 1)
+					return
+				}
+				for i, _item := range test.expected {
+					//			t.Logf("item %v %v", _item, tokens[i])
+					if _item.String() != tokens[i].String() {
+						t.Errorf("ERROR %s: expected token %s, got %s\n", test.name, _item, tokens[i])
+						atomic.AddUint64(&failed, 1)
+						return
+					}
+				}
+				atomic.AddUint64(&passed, 1)
+			})
 		}
-		if len(test.expected) != len(tokens) {
-			t.Errorf("ERROR %s: expected %d tokens, got %d\n", test.name, len(test.expected), len(tokens))
-			failed++
-			continue
-		}
-		for i, _item := range test.expected {
-			//			t.Logf("item %v %v", _item, tokens[i])
-			if _item.String() != tokens[i].String() {
-				t.Errorf("ERROR %s: expected token %s, got %s\n", test.name, _item, tokens[i])
-				failed++
-				continue
-			}
-		}
-		passed++
 	}
+	t.Run("lexer group", group)
 	t.Logf("%d tests %d passed %d failed", len(tests), passed, failed)
 }
