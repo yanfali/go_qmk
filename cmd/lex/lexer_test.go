@@ -25,7 +25,7 @@ func TestLexer(t *testing.T) {
 			name:  "a multline with one space before next line",
 			input: "#comment \\ \nsome more comment\n#a new comment",
 			expected: []item{
-				{typ: itemComment, val: "#comment \\ \nsome more comment\n"},
+				{typ: itemComment, val: "#comment \\ \nsome more comment"},
 				{typ: itemComment, val: "#a new comment"},
 				{typ: itemEOF, val: ""},
 			},
@@ -34,7 +34,7 @@ func TestLexer(t *testing.T) {
 			name:  "a multline with 3 spaces before next line",
 			input: "#comment \\   \nsome more comment\n",
 			expected: []item{
-				{typ: itemComment, val: "#comment \\   \nsome more comment\n"},
+				{typ: itemComment, val: "#comment \\   \nsome more comment"},
 				{typ: itemEOF, val: ""},
 			},
 		},
@@ -59,7 +59,7 @@ func TestLexer(t *testing.T) {
 			input: "MCU = atmega32u4 # comment\nMOUSE_ENABLE=yes",
 			expected: []item{
 				{typ: itemAssignment, val: "MCU = atmega32u4 "},
-				{typ: itemComment, val: "# comment\n"},
+				{typ: itemComment, val: "# comment"},
 				{typ: itemAssignment, val: "MOUSE_ENABLE=yes"},
 				{typ: itemEOF},
 			},
@@ -103,6 +103,20 @@ func TestLexer(t *testing.T) {
 			input: "MCU != atmega32u4",
 			expected: []item{
 				{typ: itemAssignment, val: "MCU != atmega32u4"},
+				{typ: itemEOF},
+			},
+		},
+		{
+			name:  "empty",
+			input: "",
+			expected: []item{
+				{typ: itemEOF},
+			},
+		},
+		{
+			name:  "empty spaces",
+			input: "    \r \t \n",
+			expected: []item{
 				{typ: itemEOF},
 			},
 		},

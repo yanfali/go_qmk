@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -69,13 +70,6 @@ type lexer struct {
 	items chan item // channel of scanned items.
 }
 
-func (l *lexer) run() {
-	for state := lexText; state != nil; {
-		state = state(l)
-	}
-	close(l.items)
-}
-
 func (l *lexer) emit(t itemType) {
 	l.items <- item{t, l.input[l.start:l.pos]}
 	l.start = l.pos
@@ -95,7 +89,7 @@ func lexText(l *lexer) stateFn {
 		if r == eof {
 			break
 		}
-		if r == ' ' || r == '\n' {
+		if unicode.IsSpace(r) {
 			l.ignore()
 		} else {
 			l.backup()
@@ -120,7 +114,7 @@ func lexNextToken(l *lexer) stateFn {
 		}
 
 		// simply expanded variable
-		if r == ':' && l.accept(":") && l.accept(":") {
+		if r == ':' && l.accept(":") && l.accept("=") {
 			l.pos = l.start
 			return lexAssignment
 		}
@@ -158,6 +152,7 @@ func lexComment(l *lexer) stateFn {
 			break
 		// end of comment
 		case r == eof || r == '\n':
+			l.backup()
 			l.emit(itemComment)
 			return lexText
 		}
@@ -168,6 +163,7 @@ func lexAssignment(l *lexer) stateFn {
 	for {
 		r := l.next()
 		if r == eof || r == '\n' {
+			l.backup()
 			goto emitAssignment
 		}
 		if r == '#' {
