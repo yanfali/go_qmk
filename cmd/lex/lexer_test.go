@@ -116,12 +116,13 @@ func TestLexer(t *testing.T) {
 			test := test
 			t.Run(test.name, func(t *testing.T) {
 				t.Parallel()
-				_, ch := lex(test.name, test.input)
+				_lexer := lex(test.name, test.input)
 
 				//fmt.Printf("test %s\n", test.name)
 				tokens := []item{}
 				for {
-					token := <-ch
+					token := _lexer.nextItem()
+
 					//fmt.Printf("%s\n", token)
 					tokens = append(tokens, token)
 					if token.typ == itemEOF {

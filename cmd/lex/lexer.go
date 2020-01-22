@@ -14,7 +14,6 @@ const (
 	itemError itemType = iota
 	itemComment
 	itemAssignment
-	itemSimplyExpanedAssignment
 	/*
 		itemFunction
 		itemRule
@@ -50,19 +49,20 @@ func (i item) String() string {
 
 type stateFn func(*lexer) stateFn
 
-func lex(name, input string) (*lexer, chan item) {
+func lex(name, input string) *lexer {
 	l := &lexer{
 		name:  name,
+		state: lexText,
 		input: input,
-		items: make(chan item),
+		items: make(chan item, 2),
 	}
-	go l.run()
-	return l, l.items
+	return l
 }
 
 type lexer struct {
 	name  string    // used only for error reports.
 	input string    // the string being scanned.
+	state stateFn   // current state of lexer
 	start int       // start position of this item.
 	pos   int       // current position in the input.
 	width int       // width of last rune read from input.
@@ -251,51 +251,16 @@ func (l *lexer) acceptRun(valid string) {
 	l.backup()
 }
 
-/*
-func main() {
-	tests := []struct {
-		name     string
-		input    string
-		expected []item
-	}{
-		{name: "a comment", input: "#comment", expected: []item{{typ: itemComment, val: "#comment"}, {typ: itemEOF, val: ""}}},
-		{
-			name:  "a multline",
-			input: "#comment \\\nsome more comment",
-			expected: []item{
-				{typ: itemComment, val: "#comment \\\nsome more comment"},
-				{typ: itemEOF, val: ""},
-			},
-		},
-		{name: "a multline with one space before next line", input: "#comment \\ \nsome more comment\n#a new comment"},
-		{name: "a multline with 3 spaces before next line", input: "#comment \\   \nsome more comment\n"},
-		{name: "a recursively expanded variable", input: "MCU = atmega32u4"},
-		{name: "a variable and a comment", input: "MCU = atmega32u4 # comment"},
-		{name: "2 vars and a comment", input: "MCU = atmega32u4 # comment\nMOUSE_ENABLE=yes"},
-		{name: "a optional variable", input: "MCU ?= atmega32u4 # comment it"},
-		{name: "a addition variable", input: "MCU += atmega32u4 # comment it 2"},
-		{name: "a simply expanded variable", input: "MCU := atmega32u4"},
-		{name: "a simply expanded variable 2", input: "MCU ::= atmega32u4"},
-		{name: "a shell expanded variable", input: "MCU != atmega32u4"},
-	}
-
-	for _, test := range tests {
-		_, ch := lex(test.name, test.input)
-
-		fmt.Printf("test %s\n", test.name)
-		tokens := []item{}
-		for {
-			token := <-ch
-			fmt.Printf("%s\n", token)
-			tokens = append(tokens, token)
-			if token.typ == itemEOF {
-				break
-			}
-		}
-		if len(test.expected) > 0 && len(test.expected) != len(tokens) {
-			fmt.Printf("test.expected %d tokens, got %d\n", len(test.expected), len(tokens))
-			panic(fmt.Errorf("test failed %s", test.name))
+// This insight into concurrency by Pike is just amazing.
+// Select against the channel if there's nothing to do,
+// keep running the state machine otherwise return the token
+func (l *lexer) nextItem() item {
+	for {
+		select {
+		case item := <-l.items:
+			return item
+		default:
+			l.state = l.state(l)
 		}
 	}
 }
-*/
