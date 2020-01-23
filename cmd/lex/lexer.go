@@ -15,10 +15,10 @@ const (
 	itemError itemType = iota
 	itemComment
 	itemAssignment
+	itemConditional
 	/*
 		itemFunction
 		itemRule
-		itemConditional
 		itemDefine
 		itemInclude
 		itemExport
@@ -40,6 +40,8 @@ func (i item) String() string {
 		return fmt.Sprintf("%d COMMENT %q", i.line, i.val)
 	case itemAssignment:
 		return fmt.Sprintf("%d ASSIGNMENT %q", i.line, i.val)
+	case itemConditional:
+		return fmt.Sprintf("%d CONDITIONAL %q", i.line, i.val)
 	case itemError:
 		return i.val
 	}
@@ -84,8 +86,15 @@ const startComment = "#"
 
 func lexText(l *lexer) stateFn {
 	for {
-		if strings.HasPrefix(l.input[l.pos:], startComment) {
-			return lexComment(l)
+		curStr := l.input[l.pos:]
+		if strings.HasPrefix(curStr, startComment) {
+			return lexComment
+		}
+
+		if strings.HasPrefix(curStr, "ifeq") ||
+			strings.HasPrefix(curStr, "ifneq") ||
+			strings.HasPrefix(curStr, "ifdef") {
+			return lexConditional
 		}
 
 		r := l.next()
@@ -93,14 +102,21 @@ func lexText(l *lexer) stateFn {
 			break
 		}
 		if unicode.IsSpace(r) {
-			if r == '\n' {
+			switch r {
+			case '\r':
+				l.ignore()
+				break
+			case '\n':
 				// count lines for debugging
 				l.line++
+				l.ignore()
+				break
 			}
-			l.ignore()
-		} else {
-			l.backup()
-			return lexNextToken(l)
+		}
+
+		wholeStr := l.input[l.start:]
+		if l.start != l.pos && strings.Contains(wholeStr, "=") {
+			return lexAssignment(l)
 		}
 
 	}
@@ -115,36 +131,6 @@ func (l *lexer) errorf(format string, values ...interface{}) stateFn {
 		l.line,
 	}
 	return nil
-}
-
-func lexNextToken(l *lexer) stateFn {
-	l.acceptRun("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	// found a simple assignment
-	for {
-		r := l.next()
-		// recursively expanded
-		// simply expanded variable
-		if r == ':' && l.peek() == '=' {
-			l.pos = l.start
-			return lexAssignment
-		}
-
-		// simply expanded variable
-		if r == ':' && l.accept(":") && l.accept("=") {
-			l.pos = l.start
-			return lexAssignment
-		}
-
-		// optional setting and append setting
-		if (r == '?' || r == '+') && l.peek() == '=' {
-			l.pos = l.start
-			return lexAssignment
-		}
-		if r == '=' {
-			l.pos = l.start
-			return lexAssignment
-		}
-	}
 }
 
 func lexComment(l *lexer) stateFn {
@@ -205,16 +191,22 @@ emitAssignment:
 	return lexText
 }
 
+func lexConditional(l *lexer) stateFn {
+	for {
+		if strings.HasSuffix(l.input[l.start:l.pos], "endif") {
+			l.emit(itemConditional)
+			return lexText
+		}
+		l.next()
+	}
+}
+
 /*
 func lexFunction(l *lexer) stateFn {
 	return lexText
 }
 
 func lexRule(l *lexer) stateFn {
-	return lexText
-}
-
-func lexConditional(l *lexer) stateFn {
 	return lexText
 }
 

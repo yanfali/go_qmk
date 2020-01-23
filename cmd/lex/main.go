@@ -3,11 +3,18 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 )
 
 func main() {
+	if len(os.Args) < 1 {
+		log.Fatalf("filename required")
+	}
 	filename := os.Args[1]
+	if filename == "" {
+		log.Fatalf("filename required")
+	}
 	input, err := ioutil.ReadFile(filename)
 	if err != nil {
 		panic(err)

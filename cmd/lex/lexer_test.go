@@ -153,6 +153,30 @@ func TestLexer(t *testing.T) {
 				{typ: itemEOF},
 			},
 		},
+		{
+			name:  "conditional",
+			input: "ifeq endif",
+			expected: []item{
+				{line: 1, typ: itemConditional, val: "ifeq endif"},
+				{typ: itemEOF},
+			},
+		},
+		{
+			name:  "conditional",
+			input: "ifneq endif",
+			expected: []item{
+				{line: 1, typ: itemConditional, val: "ifneq endif"},
+				{typ: itemEOF},
+			},
+		},
+		{
+			name:  "conditional",
+			input: "ifdef endif",
+			expected: []item{
+				{line: 1, typ: itemConditional, val: "ifdef endif"},
+				{typ: itemEOF},
+			},
+		},
 	}
 
 	var passed uint64
@@ -177,14 +201,14 @@ func TestLexer(t *testing.T) {
 					}
 				}
 				if len(test.expected) != len(tokens) {
-					t.Errorf("ERROR %s: expected %d tokens, got %d\n", test.name, len(test.expected), len(tokens))
+					t.Errorf("ERROR %s: expected %d tokens, got %d (%+v)\n", test.name, len(test.expected), len(tokens), tokens)
 					atomic.AddUint64(&failed, 1)
 					return
 				}
 				for i, _item := range test.expected {
 					//			t.Logf("item %v %v", _item, tokens[i])
 					if _item.String() != tokens[i].String() {
-						t.Errorf("ERROR %s on line %d: expected token %s, got %s\n", test.name, tokens[i].line, _item, tokens[i])
+						t.Errorf("ERROR %s on line %d: expected token %s, got %s (%+v)\n", test.name, tokens[i].line, _item, tokens[i], tokens)
 						atomic.AddUint64(&failed, 1)
 						return
 					}
