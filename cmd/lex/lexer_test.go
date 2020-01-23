@@ -12,12 +12,19 @@ func TestLexer(t *testing.T) {
 		input    string
 		expected []item
 	}{
-		{name: "a comment", input: "#comment", expected: []item{{typ: itemComment, val: "#comment"}, {typ: itemEOF, val: ""}}},
+		{
+			name:  "a comment",
+			input: "#comment",
+			expected: []item{
+				{line: 1, typ: itemComment, val: "#comment"},
+				{line: 2, typ: itemEOF, val: ""},
+			},
+		},
 		{
 			name:  "a multline",
 			input: "#comment \\\nsome more comment",
 			expected: []item{
-				{typ: itemComment, val: "#comment \\\nsome more comment"},
+				{line: 1, typ: itemComment, val: "#comment \\\nsome more comment"},
 				{typ: itemEOF, val: ""},
 			},
 		},
@@ -25,8 +32,8 @@ func TestLexer(t *testing.T) {
 			name:  "a multline with one space before next line",
 			input: "#comment \\ \nsome more comment\n#a new comment",
 			expected: []item{
-				{typ: itemComment, val: "#comment \\ \nsome more comment"},
-				{typ: itemComment, val: "#a new comment"},
+				{line: 1, typ: itemComment, val: "#comment \\ \nsome more comment"},
+				{line: 3, typ: itemComment, val: "#a new comment"},
 				{typ: itemEOF, val: ""},
 			},
 		},
@@ -34,14 +41,14 @@ func TestLexer(t *testing.T) {
 			name:  "a multline with 3 spaces before next line",
 			input: "#comment \\   \nsome more comment\n",
 			expected: []item{
-				{typ: itemComment, val: "#comment \\   \nsome more comment"},
+				{line: 1, typ: itemComment, val: "#comment \\   \nsome more comment"},
 				{typ: itemEOF, val: ""},
 			},
 		},
 		{
 			name: "a recursively expanded variable", input: "MCU = atmega32u4",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU = atmega32u4"},
+				{line: 1, typ: itemAssignment, val: "MCU = atmega32u4"},
 				{typ: itemEOF, val: ""},
 			},
 		},
@@ -49,8 +56,8 @@ func TestLexer(t *testing.T) {
 			name:  "a variable and a comment",
 			input: "MCU = atmega32u4 # comment",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU = atmega32u4 "},
-				{typ: itemComment, val: "# comment"},
+				{line: 1, typ: itemAssignment, val: "MCU = atmega32u4 "},
+				{line: 1, typ: itemComment, val: "# comment"},
 				{typ: itemEOF, val: ""},
 			},
 		},
@@ -58,9 +65,9 @@ func TestLexer(t *testing.T) {
 			name:  "2 vars and a comment",
 			input: "MCU = atmega32u4 # comment\nMOUSE_ENABLE=yes",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU = atmega32u4 "},
-				{typ: itemComment, val: "# comment"},
-				{typ: itemAssignment, val: "MOUSE_ENABLE=yes"},
+				{line: 1, typ: itemAssignment, val: "MCU = atmega32u4 "},
+				{line: 1, typ: itemComment, val: "# comment"},
+				{line: 2, typ: itemAssignment, val: "MOUSE_ENABLE=yes"},
 				{typ: itemEOF},
 			},
 		},
@@ -68,8 +75,8 @@ func TestLexer(t *testing.T) {
 			name:  "a optional variable",
 			input: "MCU ?= atmega32u4 # comment it",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU ?= atmega32u4 "},
-				{typ: itemComment, val: "# comment it"},
+				{line: 1, typ: itemAssignment, val: "MCU ?= atmega32u4 "},
+				{line: 1, typ: itemComment, val: "# comment it"},
 				{typ: itemEOF},
 			},
 		},
@@ -77,8 +84,8 @@ func TestLexer(t *testing.T) {
 			name:  "a addition variable",
 			input: "MCU += atmega32u4 # comment it 2",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU += atmega32u4 "},
-				{typ: itemComment, val: "# comment it 2"},
+				{line: 1, typ: itemAssignment, val: "MCU += atmega32u4 "},
+				{line: 1, typ: itemComment, val: "# comment it 2"},
 				{typ: itemEOF},
 			},
 		},
@@ -86,7 +93,7 @@ func TestLexer(t *testing.T) {
 			name:  "a simply expanded variable",
 			input: "MCU := atmega32u4",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU := atmega32u4"},
+				{line: 1, typ: itemAssignment, val: "MCU := atmega32u4"},
 				{typ: itemEOF},
 			},
 		},
@@ -94,7 +101,7 @@ func TestLexer(t *testing.T) {
 			name:  "a simply expanded variable 2",
 			input: "MCU ::= atmega32u4",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU ::= atmega32u4"},
+				{line: 1, typ: itemAssignment, val: "MCU ::= atmega32u4"},
 				{typ: itemEOF},
 			},
 		},
@@ -102,7 +109,7 @@ func TestLexer(t *testing.T) {
 			name:  "a shell expanded variable",
 			input: "MCU != atmega32u4",
 			expected: []item{
-				{typ: itemAssignment, val: "MCU != atmega32u4"},
+				{line: 1, typ: itemAssignment, val: "MCU != atmega32u4"},
 				{typ: itemEOF},
 			},
 		},
@@ -124,8 +131,8 @@ func TestLexer(t *testing.T) {
 			name:  "windows eol",
 			input: "#comment\r\nMCU = stm32",
 			expected: []item{
-				{typ: itemComment, val: "#comment"},
-				{typ: itemAssignment, val: "MCU = stm32"},
+				{line: 1, typ: itemComment, val: "#comment"},
+				{line: 2, typ: itemAssignment, val: "MCU = stm32"},
 				{typ: itemEOF},
 			},
 		},
@@ -133,7 +140,16 @@ func TestLexer(t *testing.T) {
 			name:  "multi-line assignment",
 			input: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c",
 			expected: []item{
-				{typ: itemAssignment, val: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c"},
+				{line: 1, typ: itemAssignment, val: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c"},
+				{typ: itemEOF},
+			},
+		},
+		{
+			name:  "multi-line assignment and comment",
+			input: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c\n# a comment",
+			expected: []item{
+				{line: 1, typ: itemAssignment, val: "SRC =\tkeyboards/wilba_tech/wt_main.c \\\n\t\tkeyboards/wilba_tech/wt_rgb_backlight.c \\\n\t\tdrivers/issi/is31fl3733.c \\\n\t\tquantum/color.c \\\n\t\tdrivers/arm/i2c_master.c"},
+				{line: 6, typ: itemComment, val: "# a comment"},
 				{typ: itemEOF},
 			},
 		},
@@ -168,7 +184,7 @@ func TestLexer(t *testing.T) {
 				for i, _item := range test.expected {
 					//			t.Logf("item %v %v", _item, tokens[i])
 					if _item.String() != tokens[i].String() {
-						t.Errorf("ERROR %s: expected token %s, got %s\n", test.name, _item, tokens[i])
+						t.Errorf("ERROR %s on line %d: expected token %s, got %s\n", test.name, tokens[i].line, _item, tokens[i])
 						atomic.AddUint64(&failed, 1)
 						return
 					}

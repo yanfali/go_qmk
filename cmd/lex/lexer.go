@@ -27,8 +27,9 @@ const (
 )
 
 type item struct {
-	typ itemType
-	val string
+	typ  itemType
+	val  string
+	line int
 }
 
 func (i item) String() string {
@@ -36,16 +37,16 @@ func (i item) String() string {
 	case itemEOF:
 		return "EOF"
 	case itemComment:
-		return fmt.Sprintf("COMMENT %q", i.val)
+		return fmt.Sprintf("%d COMMENT %q", i.line, i.val)
 	case itemAssignment:
-		return fmt.Sprintf("ASSIGNMENT %q", i.val)
+		return fmt.Sprintf("%d ASSIGNMENT %q", i.line, i.val)
 	case itemError:
 		return i.val
 	}
 	if len(i.val) > 10 {
-		return fmt.Sprintf("%.10q...", i.val)
+		return fmt.Sprintf("%d %.10q...", i.line, i.val)
 	}
-	return fmt.Sprintf("%q", i.val)
+	return fmt.Sprintf("%d %q", i.line, i.val)
 }
 
 type stateFn func(*lexer) stateFn
@@ -56,6 +57,7 @@ func lex(name, input string) *lexer {
 		state: lexText,
 		input: input,
 		items: make(chan item, 2),
+		line:  1,
 	}
 	return l
 }
@@ -68,10 +70,11 @@ type lexer struct {
 	pos   int       // current position in the input.
 	width int       // width of last rune read from input.
 	items chan item // channel of scanned items.
+	line  int       // current line number
 }
 
 func (l *lexer) emit(t itemType) {
-	l.items <- item{t, l.input[l.start:l.pos]}
+	l.items <- item{t, l.input[l.start:l.pos], l.line}
 	l.start = l.pos
 }
 
@@ -90,6 +93,10 @@ func lexText(l *lexer) stateFn {
 			break
 		}
 		if unicode.IsSpace(r) {
+			if r == '\n' {
+				// count lines for debugging
+				l.line++
+			}
 			l.ignore()
 		} else {
 			l.backup()
@@ -98,6 +105,15 @@ func lexText(l *lexer) stateFn {
 
 	}
 	l.emit(itemEOF)
+	return nil
+}
+
+func (l *lexer) errorf(format string, values ...interface{}) stateFn {
+	l.items <- item{
+		itemError,
+		fmt.Sprintf(format, values...),
+		l.line,
+	}
 	return nil
 }
 
@@ -132,14 +148,15 @@ func lexNextToken(l *lexer) stateFn {
 }
 
 func lexComment(l *lexer) stateFn {
+	skipped := 0
 	for {
 		switch r := l.next(); r {
 		// continuation
 		// scan until new line or eof
 		case '\\':
 			for {
-				r = l.next()
-				if isEOL(r, l) {
+				if isEOL(l.next(), l) {
+					skipped++
 					break
 				}
 			}
@@ -149,6 +166,7 @@ func lexComment(l *lexer) stateFn {
 			if isEOL(r, l) {
 				l.backup()
 				l.emit(itemComment)
+				l.line += skipped
 				return lexText
 			}
 		}
@@ -160,29 +178,30 @@ func isEOL(r rune, l *lexer) bool {
 }
 
 func lexAssignment(l *lexer) stateFn {
+	skipped := 0
 	for {
 		r := l.next()
 		// handle multiline assignment
 		if r == '\\' {
 			for {
-				r = l.next()
-				if isEOL(r, l) {
+				if isEOL(l.next(), l) {
+					skipped++
 					break
 				}
 			}
 			continue
 		}
 		if isEOL(r, l) {
-			l.backup()
 			goto emitAssignment
 		}
 		if r == '#' {
-			l.backup()
 			goto emitAssignment
 		}
 	}
 emitAssignment:
+	l.backup()
 	l.emit(itemAssignment)
+	l.line += skipped
 	return lexText
 }
 
